@@ -235,12 +235,20 @@ def save_crop():
         processor = ImageProcessor()
         cropped_path = processor.crop_image(original_path, crop_data)
         
+        # Create thumbnail for preview
+        thumbnail_path = processor.create_thumbnail(cropped_path)
+        
         # Update session
         session['workbooks'][workbook_index]['cropped_path'] = cropped_path
+        session['workbooks'][workbook_index]['thumbnail_path'] = thumbnail_path
         session['workbooks'][workbook_index]['cropped'] = True
         session.modified = True
         
-        return jsonify({'success': True, 'cropped_filename': os.path.basename(cropped_path)})
+        return jsonify({
+            'success': True, 
+            'cropped_filename': os.path.basename(cropped_path),
+            'thumbnail_filename': os.path.basename(thumbnail_path)
+        })
         
     except Exception as e:
         logging.error(f"Error saving crop: {str(e)}")

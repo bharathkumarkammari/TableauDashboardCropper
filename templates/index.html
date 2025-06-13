@@ -149,7 +149,13 @@
 
                         <!-- Preview -->
                         <div class="preview-section mt-3" data-workbook-index="{{ i }}" style="display: none;">
-                            <img class="img-fluid rounded preview-img" style="max-height: 120px;">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <span class="badge bg-success">
+                                    <i data-feather="check"></i>
+                                    Cropped ✓
+                                </span>
+                            </div>
+                            <img class="img-fluid rounded preview-img" style="max-height: 120px; border: 2px solid var(--bs-success);">
                         </div>
                     </div>
                 </div>
@@ -406,6 +412,30 @@
         
         // Call this periodically or after cropping operations
         setInterval(checkCombineReady, 1000);
+
+        // Handle crop completion messages
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'cropComplete') {
+                const workbookIndex = event.data.workbookIndex;
+                const thumbnailFilename = event.data.thumbnailFilename;
+                
+                // Show preview section
+                const previewSection = document.querySelector(`.preview-section[data-workbook-index="${workbookIndex}"]`);
+                const previewImg = previewSection.querySelector('.preview-img');
+                
+                previewImg.src = `/image/${thumbnailFilename}`;
+                previewSection.style.display = 'block';
+                
+                // Update crop status
+                const cropStatus = document.querySelector(`.crop-status[data-workbook-index="${workbookIndex}"] .badge`);
+                cropStatus.className = 'badge bg-success';
+                cropStatus.innerHTML = '<i data-feather="check"></i> Cropped ✓';
+                feather.replace();
+                
+                // Check if combine section should be shown
+                checkCombineReady();
+            }
+        });
 
         // Handle combine form submission with filename prompt
         document.getElementById('combineForm').addEventListener('submit', function(e) {

@@ -4,7 +4,9 @@ from PIL import Image
 from pdf2image import convert_from_path
 from PyPDF2 import PdfMerger
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt
+from docx.enum.table import WD_ALIGN_VERTICAL
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from typing import List, Dict, Any
 import tempfile
 from datetime import datetime
@@ -166,7 +168,7 @@ class ImageProcessor:
             raise Exception(f"Word document creation failed: {str(e)}")
     
     def combine_to_word_with_details(self, image_paths: List[str], output_dir: str, filename: str, summary_data: List[Dict]) -> str:
-        """Combine multiple images into a single Word document with detailed metadata"""
+        """Combine multiple images into a single Word document with detailed metadata using 2-column layout"""
         try:
             output_path = os.path.join(output_dir, f"{filename}.docx")
             
@@ -174,68 +176,43 @@ class ImageProcessor:
             doc = Document()
             
             # Add main title
-            doc.add_heading('Tableau Dashboard Export Report', 0)
+            title = doc.add_heading('Tableau Dashboard Export Report', 0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
-            # Add summary information
+            # Add summary information on first page
             doc.add_heading('Export Summary', level=1)
             summary_para = doc.add_paragraph()
-            summary_para.add_run(f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
-            summary_para.add_run(f'Total Dashboards: {len(summary_data)}\n')
+            summary_para.add_run('Generated: ').bold = True
+            summary_para.add_run(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+            summary_para.add_run('Total Dashboards: ').bold = True
+            summary_para.add_run(f'{len(summary_data)}\n')
+            summary_para.add_run('Export Format: ').bold = True
+            summary_para.add_run('Microsoft Word Document (.docx)')
             
-            # Add each dashboard with metadata
-            for i, (image_path, data) in enumerate(zip(image_paths, summary_data)):
-                if not os.path.exists(image_path):
-                    logging.warning(f"Image not found: {image_path}")
-                    continue
+            # Add page break after summary
+            doc.add_page_break()
+            
+            # Process dashboards in pairs for same-page layout
+            for i in range(0, len(image_paths), 2):
+                # Add page heading for dashboard(s)
+                if i + 1 < len(image_paths):
+                    page_title = f'Dashboards {i + 1} & {i + 2}'
+                else:
+                    page_title = f'Dashboard {i + 1}'
                 
-                # Add section heading
-                doc.add_heading(f'Dashboard {data.get("section", i + 1)}', level=1)
+                doc.add_heading(page_title, level=1)
                 
-                # Add metadata table
-                metadata_para = doc.add_paragraph()
-                metadata_para.add_run('Project: ').bold = True
-                metadata_para.add_run(f'{data.get("project", "Unknown")}\n')
+                # First dashboard
+                self._add_dashboard_to_word(doc, image_paths[i], summary_data[i], i + 1)
                 
-                metadata_para.add_run('Workbook: ').bold = True
-                metadata_para.add_run(f'{data.get("workbook", "Unknown")}\n')
+                # Second dashboard on same page (if exists)
+                if i + 1 < len(image_paths):
+                    # Add some spacing between dashboards
+                    doc.add_paragraph()
+                    self._add_dashboard_to_word(doc, image_paths[i + 1], summary_data[i + 1], i + 2)
                 
-                metadata_para.add_run('Dashboard: ').bold = True
-                metadata_para.add_run(f'{data.get("dashboard", "Unknown")}\n')
-                
-                metadata_para.add_run('Exported: ').bold = True
-                metadata_para.add_run(f'{data.get("timestamp", "Unknown")}\n')
-                
-                # Add some spacing
-                doc.add_paragraph()
-                
-                # Add image to document
-                try:
-                    image = Image.open(image_path)
-                    # Calculate appropriate width (max 6.5 inches to fit on page)
-                    img_width = image.width
-                    img_height = image.height
-                    aspect_ratio = img_height / img_width
-                    
-                    # Set max width to 6.5 inches
-                    max_width = 6.5
-                    if img_width > img_height:
-                        # Landscape image
-                        width_inches = max_width
-                    else:
-                        # Portrait image, might need smaller width
-                        width_inches = min(max_width, 5.0)
-                    
-                    doc.add_picture(image_path, width=Inches(width_inches))
-                    logging.info(f"Added image {image_path} to Word document with width {width_inches} inches")
-                    
-                except Exception as img_error:
-                    logging.error(f"Failed to add image {image_path}: {str(img_error)}")
-                    # Add error message instead of image
-                    error_para = doc.add_paragraph()
-                    error_para.add_run(f'[Error loading image: {os.path.basename(image_path)}]').italic = True
-                
-                # Add page break if not the last image
-                if i < len(image_paths) - 1:
+                # Add page break if not the last pair
+                if i + 2 < len(image_paths):
                     doc.add_page_break()
             
             # Save document
@@ -247,6 +224,71 @@ class ImageProcessor:
         except Exception as e:
             logging.error(f"Failed to combine images to Word with details: {str(e)}")
             raise Exception(f"Detailed Word document creation failed: {str(e)}")
+    
+    def _add_dashboard_to_word(self, doc, image_path: str, data: Dict, section_num: int):
+        """Add a single dashboard to Word document with 2-column layout"""
+        try:
+            if not os.path.exists(image_path):
+                logging.warning(f"Image not found: {image_path}")
+                return
+            
+            # Create a table for 2-column layout
+            table = doc.add_table(rows=1, cols=2)
+            table.style = 'Table Grid'
+            
+            # Set column widths (50% each)
+            for cell in table.rows[0].cells:
+                cell.width = Inches(3.25)  # Half of 6.5 inch page width
+            
+            # Left column - Image
+            left_cell = table.rows[0].cells[0]
+            left_para = left_cell.paragraphs[0]
+            
+            # Add image to left cell
+            image = Image.open(image_path)
+            img_width = image.width
+            img_height = image.height
+            aspect_ratio = img_height / img_width
+            
+            # Set image width to fit in left column (3 inches max)
+            img_width_inches = 3.0
+            
+            run = left_para.runs[0] if left_para.runs else left_para.add_run()
+            run.add_picture(image_path, width=Inches(img_width_inches))
+            
+            # Right column - Metadata
+            right_cell = table.rows[0].cells[1]
+            right_para = right_cell.paragraphs[0]
+            
+            # Add section title
+            title_run = right_para.add_run(f'Dashboard {section_num}\n')
+            title_run.font.size = Pt(14)
+            title_run.bold = True
+            
+            # Add metadata
+            right_para.add_run('\nProject: ').bold = True
+            right_para.add_run(f'{data.get("project", "Unknown")}\n')
+            
+            right_para.add_run('Workbook: ').bold = True
+            right_para.add_run(f'{data.get("workbook", "Unknown")}\n')
+            
+            right_para.add_run('Dashboard: ').bold = True
+            right_para.add_run(f'{data.get("dashboard", "Unknown")}\n')
+            
+            right_para.add_run('Exported: ').bold = True
+            right_para.add_run(f'{data.get("timestamp", "Unknown")}')
+            
+            # Set vertical alignment for cells
+            left_cell.vertical_alignment = 1  # Center
+            right_cell.vertical_alignment = 1  # Center
+            
+            logging.info(f"Added dashboard {section_num} to Word document in 2-column layout")
+            
+        except Exception as img_error:
+            logging.error(f"Failed to add dashboard {section_num}: {str(img_error)}")
+            # Add error message instead
+            error_para = doc.add_paragraph()
+            error_para.add_run(f'[Error loading Dashboard {section_num}: {os.path.basename(image_path)}]').italic = True
     
     def create_thumbnail(self, image_path: str, max_width: int = 200, max_height: int = 120) -> str:
         """Create a thumbnail of an image"""

@@ -220,6 +220,15 @@ function initializeCropper(imageUrl, workbookIndex) {
             saveBtn.classList.add('btn-outline-success');
             feather.replace();
             
+            // Pass thumbnail data back to parent window
+            if (window.opener && data.thumbnail_filename) {
+                window.opener.postMessage({
+                    type: 'cropComplete',
+                    workbookIndex: workbookIndex,
+                    thumbnailFilename: data.thumbnail_filename
+                }, '*');
+            }
+            
             setTimeout(() => {
                 window.location.href = '/';
             }, 1500);
