@@ -1,0 +1,16 @@
+Tableau Dashboard Export Summary
+Generated: 2025-06-13 19:28:50
+User: r.ach.e.lamn.a.oa@gmail.com
+
+[Section 1]
+Project: 
+Workbook: 
+Dashboard: 
+Exported: 2025-06-13 19:26:18
+
+[Section 2]
+Project: 
+Workbook: 
+Dashboard: 
+Exported: 2025-06-13 19:26:52
+

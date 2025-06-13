@@ -163,7 +163,7 @@
                 <h5><i data-feather="package"></i> Combine & Export</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('combine_images') }}">
+                <form id="combineForm">
                     <div class="row align-items-end">
                         <div class="col-md-6">
                             <label for="format" class="form-label">Output Format</label>
@@ -173,7 +173,7 @@
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <button type="submit" class="btn btn-success">
+                            <button type="submit" class="btn btn-success" id="combineBtn">
                                 <i data-feather="download"></i>
                                 Combine & Download
                             </button>
@@ -320,8 +320,14 @@
                 e.preventDefault();
                 const btn = e.target.closest('.export-btn');
                 const workbookIndex = btn.dataset.workbookIndex;
+                const projectSelect = document.querySelector(`.project-select[data-workbook-index="${workbookIndex}"]`);
+                const workbookSelect = document.querySelector(`.workbook-select[data-workbook-index="${workbookIndex}"]`);
                 const dashboardSelect = document.querySelector(`.dashboard-select[data-workbook-index="${workbookIndex}"]`);
+                
                 const viewId = dashboardSelect.value;
+                const projectName = projectSelect.value;
+                const workbookName = workbookSelect.options[workbookSelect.selectedIndex]?.dataset.name || workbookSelect.options[workbookSelect.selectedIndex]?.text;
+                const dashboardName = dashboardSelect.options[dashboardSelect.selectedIndex]?.text;
                 
                 if (!viewId) return;
                 
@@ -338,7 +344,10 @@
                     },
                     body: JSON.stringify({
                         view_id: viewId,
-                        workbook_index: parseInt(workbookIndex)
+                        workbook_index: parseInt(workbookIndex),
+                        project_name: projectName,
+                        workbook_name: workbookName,
+                        dashboard_name: dashboardName
                     })
                 })
                 .then(response => response.json())
@@ -397,6 +406,83 @@
         
         // Call this periodically or after cropping operations
         setInterval(checkCombineReady, 1000);
+
+        // Handle combine form submission with filename prompt
+        document.getElementById('combineForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const format = document.getElementById('format').value;
+            const extension = format === 'pdf' ? '.pdf' : '.docx';
+            
+            // Prompt user for filename
+            const filename = prompt(`Enter a filename for your ${format.toUpperCase()} document:`, 'dashboard_report');
+            
+            if (filename === null) {
+                // User cancelled
+                return;
+            }
+            
+            // Clean filename and add extension if not present
+            let cleanFilename = filename.trim() || 'dashboard_report';
+            if (!cleanFilename.endsWith(extension)) {
+                cleanFilename += extension;
+            }
+            
+            // Show loading state
+            const btn = document.getElementById('combineBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i data-feather="loader"></i> Processing...';
+            feather.replace();
+            
+            // Submit via fetch
+            fetch('/combine', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    format: format,
+                    filename: cleanFilename
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                } else {
+                    throw new Error('Failed to generate document');
+                }
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = cleanFilename;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Show success message
+                alert(`${format.toUpperCase()} document "${cleanFilename}" has been generated and downloaded successfully!`);
+                
+                // Reset button
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                feather.replace();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error generating document: ' + error.message);
+                
+                // Reset button
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                feather.replace();
+            });
+        });
     </script>
 </body>
 </html>

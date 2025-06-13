@@ -7,6 +7,7 @@ from docx import Document
 from docx.shared import Inches
 from typing import List, Dict, Any
 import tempfile
+from datetime import datetime
 
 class ImageProcessor:
     def __init__(self):
@@ -163,6 +164,89 @@ class ImageProcessor:
         except Exception as e:
             logging.error(f"Failed to combine images to Word: {str(e)}")
             raise Exception(f"Word document creation failed: {str(e)}")
+    
+    def combine_to_word_with_details(self, image_paths: List[str], output_dir: str, filename: str, summary_data: List[Dict]) -> str:
+        """Combine multiple images into a single Word document with detailed metadata"""
+        try:
+            output_path = os.path.join(output_dir, f"{filename}.docx")
+            
+            # Create new Word document
+            doc = Document()
+            
+            # Add main title
+            doc.add_heading('Tableau Dashboard Export Report', 0)
+            
+            # Add summary information
+            doc.add_heading('Export Summary', level=1)
+            summary_para = doc.add_paragraph()
+            summary_para.add_run(f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
+            summary_para.add_run(f'Total Dashboards: {len(summary_data)}\n')
+            
+            # Add each dashboard with metadata
+            for i, (image_path, data) in enumerate(zip(image_paths, summary_data)):
+                if not os.path.exists(image_path):
+                    logging.warning(f"Image not found: {image_path}")
+                    continue
+                
+                # Add section heading
+                doc.add_heading(f'Dashboard {data.get("section", i + 1)}', level=1)
+                
+                # Add metadata table
+                metadata_para = doc.add_paragraph()
+                metadata_para.add_run('Project: ').bold = True
+                metadata_para.add_run(f'{data.get("project", "Unknown")}\n')
+                
+                metadata_para.add_run('Workbook: ').bold = True
+                metadata_para.add_run(f'{data.get("workbook", "Unknown")}\n')
+                
+                metadata_para.add_run('Dashboard: ').bold = True
+                metadata_para.add_run(f'{data.get("dashboard", "Unknown")}\n')
+                
+                metadata_para.add_run('Exported: ').bold = True
+                metadata_para.add_run(f'{data.get("timestamp", "Unknown")}\n')
+                
+                # Add some spacing
+                doc.add_paragraph()
+                
+                # Add image to document
+                try:
+                    image = Image.open(image_path)
+                    # Calculate appropriate width (max 6.5 inches to fit on page)
+                    img_width = image.width
+                    img_height = image.height
+                    aspect_ratio = img_height / img_width
+                    
+                    # Set max width to 6.5 inches
+                    max_width = 6.5
+                    if img_width > img_height:
+                        # Landscape image
+                        width_inches = max_width
+                    else:
+                        # Portrait image, might need smaller width
+                        width_inches = min(max_width, 5.0)
+                    
+                    doc.add_picture(image_path, width=Inches(width_inches))
+                    logging.info(f"Added image {image_path} to Word document with width {width_inches} inches")
+                    
+                except Exception as img_error:
+                    logging.error(f"Failed to add image {image_path}: {str(img_error)}")
+                    # Add error message instead of image
+                    error_para = doc.add_paragraph()
+                    error_para.add_run(f'[Error loading image: {os.path.basename(image_path)}]').italic = True
+                
+                # Add page break if not the last image
+                if i < len(image_paths) - 1:
+                    doc.add_page_break()
+            
+            # Save document
+            doc.save(output_path)
+            
+            logging.info(f"Successfully created detailed Word document: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logging.error(f"Failed to combine images to Word with details: {str(e)}")
+            raise Exception(f"Detailed Word document creation failed: {str(e)}")
     
     def create_thumbnail(self, image_path: str, max_width: int = 200, max_height: int = 120) -> str:
         """Create a thumbnail of an image"""

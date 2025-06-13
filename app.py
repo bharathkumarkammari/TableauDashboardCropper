@@ -152,6 +152,9 @@ def export_dashboard():
         data = request.get_json()
         view_id = data['view_id']
         workbook_index = data['workbook_index']
+        project_name = data.get('project_name', 'Unknown')
+        workbook_name = data.get('workbook_name', 'Unknown')
+        dashboard_name = data.get('dashboard_name', 'Unknown')
         
         tableau = TableauAPI(session['tableau_server'], session['tableau_site'])
         tableau.token = session['tableau_token']
@@ -180,6 +183,9 @@ def export_dashboard():
         session['workbooks'][workbook_index]['pdf_path'] = pdf_path
         session['workbooks'][workbook_index]['png_path'] = png_path
         session['workbooks'][workbook_index]['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        session['workbooks'][workbook_index]['project'] = project_name
+        session['workbooks'][workbook_index]['workbook'] = workbook_name
+        session['workbooks'][workbook_index]['dashboard'] = dashboard_name
         session.modified = True
         
         return jsonify({
@@ -243,71 +249,82 @@ def save_crop():
 @app.route('/combine', methods=['POST'])
 def combine_images():
     if 'tableau_token' not in session:
-        return redirect(url_for('login'))
+        return jsonify({'error': 'Not authenticated'}), 401
     
     if 'workbooks' not in session:
-        flash('No workbooks selected', 'error')
-        return redirect(url_for('index'))
+        return jsonify({'error': 'No workbooks selected'}), 400
     
     # Check if all images are cropped
     for workbook in session['workbooks']:
         if not workbook.get('cropped', False):
-            flash('Please crop all images before combining', 'warning')
-            return redirect(url_for('index'))
+            return jsonify({'error': 'Please crop all images before combining'}), 400
     
     try:
-        output_format = request.form.get('format', 'pdf')
+        # Get data from JSON request
+        data = request.get_json()
+        output_format = data.get('format', 'pdf')
+        custom_filename = data.get('filename', 'dashboard_report')
+        
+        # Remove extension from filename if provided
+        base_filename = custom_filename
+        if custom_filename.endswith('.pdf') or custom_filename.endswith('.docx'):
+            base_filename = os.path.splitext(custom_filename)[0]
+        
         processor = ImageProcessor()
         
         # Get cropped image paths
-        cropped_paths = [wb['cropped_path'] for wb in session['workbooks']]
+        cropped_paths = [wb['cropped_path'] for wb in session['workbooks'] if wb.get('cropped_path')]
         
-        # Generate folder name based on workbook names
-        folder_name = "_".join([wb.get('workbook', f'workbook_{i}').replace(" ", "") 
-                               for i, wb in enumerate(session['workbooks'])])
+        if not cropped_paths:
+            return jsonify({'error': 'No cropped images found'}), 400
         
-        output_dir = os.path.join(app.config['OUTPUT_FOLDER'], folder_name)
-        os.makedirs(output_dir, exist_ok=True)
+        # Create temporary output directory
+        temp_dir = os.path.join(app.config['OUTPUT_FOLDER'], 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
         
-        # Generate summary file
-        summary_path = os.path.join(output_dir, 'summary.txt')
-        with open(summary_path, 'w') as f:
-            f.write(f"Tableau Dashboard Export Summary\n")
-            f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"User: {session.get('username', 'Unknown')}\n\n")
-            
-            for i, wb in enumerate(session['workbooks']):
-                f.write(f"[Section {i+1}]\n")
-                f.write(f"Project: {wb.get('project', 'Unknown')}\n")
-                f.write(f"Workbook: {wb.get('workbook', 'Unknown')}\n")
-                f.write(f"Dashboard: {wb.get('dashboard', 'Unknown')}\n")
-                f.write(f"Exported: {wb.get('timestamp', 'Unknown')}\n\n")
+        # Generate summary data for Word document
+        summary_data = []
+        for i, wb in enumerate(session['workbooks']):
+            summary_data.append({
+                'section': i + 1,
+                'project': wb.get('project', 'Unknown'),
+                'workbook': wb.get('workbook', 'Unknown'), 
+                'dashboard': wb.get('dashboard', 'Unknown'),
+                'timestamp': wb.get('timestamp', 'Unknown'),
+                'image_path': wb.get('cropped_path', '')
+            })
         
         # Combine images
         if output_format == 'pdf':
-            output_path = processor.combine_to_pdf(cropped_paths, output_dir, folder_name)
+            output_path = processor.combine_to_pdf(cropped_paths, temp_dir, base_filename)
         else:
-            output_path = processor.combine_to_word(cropped_paths, output_dir, folder_name)
+            output_path = processor.combine_to_word_with_details(cropped_paths, temp_dir, base_filename, summary_data)
         
-        # Clean up temporary files
-        for wb in session['workbooks']:
-            for path_key in ['pdf_path', 'png_path', 'cropped_path']:
-                if path_key in wb and os.path.exists(wb[path_key]):
-                    try:
-                        os.remove(wb[path_key])
-                    except:
-                        pass
+        # Return file for download
+        def cleanup_after_download():
+            # Clean up temporary files after a delay
+            import threading
+            import time
+            def delayed_cleanup():
+                time.sleep(30)  # Wait 30 seconds before cleanup
+                try:
+                    for wb in session['workbooks']:
+                        for path_key in ['pdf_path', 'png_path', 'cropped_path']:
+                            if path_key in wb and os.path.exists(wb[path_key]):
+                                os.remove(wb[path_key])
+                    if os.path.exists(output_path):
+                        os.remove(output_path)
+                except:
+                    pass
+            threading.Thread(target=delayed_cleanup).start()
         
-        session['last_output'] = output_path
-        session.modified = True
+        cleanup_after_download()
         
-        flash(f'Successfully combined images into {output_format.upper()}!', 'success')
-        return redirect(url_for('download_result'))
+        return send_file(output_path, as_attachment=True, download_name=custom_filename)
         
     except Exception as e:
         logging.error(f"Error combining images: {str(e)}")
-        flash(f'Error combining images: {str(e)}', 'error')
-        return redirect(url_for('index'))
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/download')
 def download_result():
