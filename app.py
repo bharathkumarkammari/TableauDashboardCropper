@@ -100,7 +100,8 @@ def get_projects():
     try:
         tableau = TableauAPI(session['tableau_server'], session['tableau_site'])
         tableau.token = session['tableau_token']
-        tableau.site_id = session['tableau_site_id']
+        tableau.site_id_response = session['tableau_site_id']
+        tableau.user_id = session['tableau_user_id']
         
         projects = tableau.get_projects()
         return jsonify({'projects': projects})
@@ -116,7 +117,8 @@ def get_workbooks(project_name):
     try:
         tableau = TableauAPI(session['tableau_server'], session['tableau_site'])
         tableau.token = session['tableau_token']
-        tableau.site_id = session['tableau_site_id']
+        tableau.site_id_response = session['tableau_site_id']
+        tableau.user_id = session['tableau_user_id']
         
         workbooks = tableau.list_workbooks_in_project(project_name)
         return jsonify({'workbooks': workbooks})
@@ -132,7 +134,8 @@ def get_dashboards(workbook_id):
     try:
         tableau = TableauAPI(session['tableau_server'], session['tableau_site'])
         tableau.token = session['tableau_token']
-        tableau.site_id = session['tableau_site_id']
+        tableau.site_id_response = session['tableau_site_id']
+        tableau.user_id = session['tableau_user_id']
         
         dashboards = tableau.get_views_in_workbook(workbook_id)
         return jsonify({'dashboards': dashboards})
@@ -152,7 +155,8 @@ def export_dashboard():
         
         tableau = TableauAPI(session['tableau_server'], session['tableau_site'])
         tableau.token = session['tableau_token']
-        tableau.site_id = session['tableau_site_id']
+        tableau.site_id_response = session['tableau_site_id']
+        tableau.user_id = session['tableau_user_id']
         
         # Export as PDF
         pdf_content = tableau.export_view_as_pdf(view_id)
