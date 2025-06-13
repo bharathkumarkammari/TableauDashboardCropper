@@ -279,8 +279,8 @@ class ImageProcessor:
             right_para.add_run(f'{data.get("timestamp", "Unknown")}')
             
             # Set vertical alignment for cells
-            left_cell.vertical_alignment = 1  # Center
-            right_cell.vertical_alignment = 1  # Center
+            left_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
+            right_cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             
             logging.info(f"Added dashboard {section_num} to Word document in 2-column layout")
             

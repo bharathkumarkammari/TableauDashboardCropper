@@ -278,6 +278,10 @@ def combine_images():
         if custom_filename.endswith('.pdf') or custom_filename.endswith('.docx'):
             base_filename = os.path.splitext(custom_filename)[0]
         
+        # Use default filename if empty
+        if not base_filename.strip():
+            base_filename = 'tableau_report'
+        
         processor = ImageProcessor()
         
         # Get cropped image paths
