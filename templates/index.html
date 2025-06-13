@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tableau Dashboard Cropper</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i data-feather="crop"></i>
+                Tableau Dashboard Cropper
+            </a>
+            <div class="navbar-nav ms-auto">
+                <span class="navbar-text me-3">
+                    Welcome, {{ session.username }}
+                </span>
+                <a class="nav-link" href="{{ url_for('logout') }}">
+                    <i data-feather="log-out"></i>
+                    Logout
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Workbook Count Selection -->
+        {% if not session.workbook_count %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5><i data-feather="settings"></i> Setup</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('set_workbook_count') }}">
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label for="count" class="form-label">How many workbooks do you want to combine?</label>
+                            <select class="form-select" id="count" name="count" required>
+                                <option value="1">1 Workbook</option>
+                                <option value="2" selected>2 Workbooks</option>
+                                <option value="3">3 Workbooks</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-primary">
+                                <i data-feather="arrow-right"></i>
+                                Continue
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Workbook Selection Interface -->
+        {% if session.workbook_count %}
+        <div class="row mb-4">
+            <div class="col">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h4>Select and Crop Dashboards ({{ session.workbook_count }} workbooks)</h4>
+                    <div>
+                        <a href="{{ url_for('reset') }}" class="btn btn-outline-secondary">
+                            <i data-feather="refresh-cw"></i>
+                            Reset
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            {% for i in range(session.workbook_count) %}
+            <div class="col-lg-{{ 12 // session.workbook_count if session.workbook_count <= 2 else 4 }} mb-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h6>Workbook {{ i + 1 }}</h6>
+                        {% if session.workbooks and i < session.workbooks|length and session.workbooks[i].timestamp %}
+                            <small class="text-muted">Last pulled: {{ session.workbooks[i].timestamp }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <!-- Project Selection -->
+                        <div class="mb-3">
+                            <label class="form-label">Project</label>
+                            <select class="form-select project-select" data-workbook-index="{{ i }}">
+                                <option value="">Select Project</option>
+                            </select>
+                        </div>
+
+                        <!-- Workbook Selection -->
+                        <div class="mb-3">
+                            <label class="form-label">Workbook</label>
+                            <select class="form-select workbook-select" data-workbook-index="{{ i }}" disabled>
+                                <option value="">Select Workbook</option>
+                            </select>
+                        </div>
+
+                        <!-- Dashboard Selection -->
+                        <div class="mb-3">
+                            <label class="form-label">Dashboard</label>
+                            <select class="form-select dashboard-select" data-workbook-index="{{ i }}" disabled>
+                                <option value="">Select Dashboard</option>
+                            </select>
+                        </div>
+
+                        <!-- Export and Crop Button -->
+                        <div class="mb-3">
+                            <button class="btn btn-secondary export-btn" data-workbook-index="{{ i }}" disabled>
+                                <i data-feather="download"></i>
+                                <span class="btn-text">Export & Prepare for Cropping</span>
+                            </button>
+                        </div>
+
+                        <!-- Crop Status and Button -->
+                        <div class="crop-section" data-workbook-index="{{ i }}" style="display: none;">
+                            <a href="#" class="btn btn-warning crop-btn" data-workbook-index="{{ i }}">
+                                <i data-feather="crop"></i>
+                                Crop Image
+                            </a>
+                            <div class="crop-status mt-2">
+                                {% if session.workbooks and i < session.workbooks|length and session.workbooks[i].cropped %}
+                                    <span class="badge bg-success">
+                                        <i data-feather="check"></i>
+                                        Cropped ✓
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <i data-feather="x"></i>
+                                        Not Cropped
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Preview -->
+                        <div class="preview-section mt-3" data-workbook-index="{{ i }}" style="display: none;">
+                            <img class="img-fluid rounded preview-img" style="max-height: 120px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Combine Section -->
+        <div class="card mt-4" id="combine-section" style="display: {{ 'block' if session.workbooks and session.workbooks|selectattr('cropped', 'equalto', true)|list|length == session.workbook_count else 'none' }};">
+            <div class="card-header">
+                <h5><i data-feather="package"></i> Combine & Export</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('combine_images') }}">
+                    <div class="row align-items-end">
+                        <div class="col-md-6">
+                            <label for="format" class="form-label">Output Format</label>
+                            <select class="form-select" id="format" name="format">
+                                <option value="pdf">PDF Document</option>
+                                <option value="docx">Word Document</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-success">
+                                <i data-feather="download"></i>
+                                Combine & Download
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        feather.replace();
+
+        // Load projects on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProjects();
+        });
+
+        function loadProjects() {
+            fetch('/get_projects')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error loading projects:', data.error);
+                        return;
+                    }
+                    
+                    const projectSelects = document.querySelectorAll('.project-select');
+                    projectSelects.forEach(select => {
+                        select.innerHTML = '<option value="">Select Project</option>';
+                        data.projects.forEach(project => {
+                            const option = document.createElement('option');
+                            option.value = project.name;
+                            option.textContent = project.name;
+                            select.appendChild(option);
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading projects:', error);
+                });
+        }
+
+        // Project selection handler
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('project-select')) {
+                const workbookIndex = e.target.dataset.workbookIndex;
+                const projectName = e.target.value;
+                const workbookSelect = document.querySelector(`.workbook-select[data-workbook-index="${workbookIndex}"]`);
+                const dashboardSelect = document.querySelector(`.dashboard-select[data-workbook-index="${workbookIndex}"]`);
+                
+                if (projectName) {
+                    fetch(`/get_workbooks/${encodeURIComponent(projectName)}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                console.error('Error loading workbooks:', data.error);
+                                return;
+                            }
+                            
+                            workbookSelect.innerHTML = '<option value="">Select Workbook</option>';
+                            data.workbooks.forEach(workbook => {
+                                const option = document.createElement('option');
+                                option.value = workbook.id;
+                                option.textContent = workbook.name;
+                                option.dataset.name = workbook.name;
+                                workbookSelect.appendChild(option);
+                            });
+                            workbookSelect.disabled = false;
+                            
+                            // Reset dashboard selection
+                            dashboardSelect.innerHTML = '<option value="">Select Dashboard</option>';
+                            dashboardSelect.disabled = true;
+                        })
+                        .catch(error => {
+                            console.error('Error loading workbooks:', error);
+                        });
+                } else {
+                    workbookSelect.innerHTML = '<option value="">Select Workbook</option>';
+                    workbookSelect.disabled = true;
+                    dashboardSelect.innerHTML = '<option value="">Select Dashboard</option>';
+                    dashboardSelect.disabled = true;
+                }
+            }
+        });
+
+        // Workbook selection handler
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('workbook-select')) {
+                const workbookIndex = e.target.dataset.workbookIndex;
+                const workbookId = e.target.value;
+                const dashboardSelect = document.querySelector(`.dashboard-select[data-workbook-index="${workbookIndex}"]`);
+                const exportBtn = document.querySelector(`.export-btn[data-workbook-index="${workbookIndex}"]`);
+                
+                if (workbookId) {
+                    fetch(`/get_dashboards/${workbookId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.error) {
+                                console.error('Error loading dashboards:', data.error);
+                                return;
+                            }
+                            
+                            dashboardSelect.innerHTML = '<option value="">Select Dashboard</option>';
+                            data.dashboards.forEach(dashboard => {
+                                const option = document.createElement('option');
+                                option.value = dashboard.id;
+                                option.textContent = dashboard.name;
+                                dashboardSelect.appendChild(option);
+                            });
+                            dashboardSelect.disabled = false;
+                        })
+                        .catch(error => {
+                            console.error('Error loading dashboards:', error);
+                        });
+                } else {
+                    dashboardSelect.innerHTML = '<option value="">Select Dashboard</option>';
+                    dashboardSelect.disabled = true;
+                    exportBtn.disabled = true;
+                }
+            }
+        });
+
+        // Dashboard selection handler
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('dashboard-select')) {
+                const workbookIndex = e.target.dataset.workbookIndex;
+                const exportBtn = document.querySelector(`.export-btn[data-workbook-index="${workbookIndex}"]`);
+                
+                if (e.target.value) {
+                    exportBtn.disabled = false;
+                } else {
+                    exportBtn.disabled = true;
+                }
+            }
+        });
+
+        // Export button handler
+        document.addEventListener('click', function(e) {
+            if (e.target.closest('.export-btn')) {
+                e.preventDefault();
+                const btn = e.target.closest('.export-btn');
+                const workbookIndex = btn.dataset.workbookIndex;
+                const dashboardSelect = document.querySelector(`.dashboard-select[data-workbook-index="${workbookIndex}"]`);
+                const viewId = dashboardSelect.value;
+                
+                if (!viewId) return;
+                
+                // Show loading state
+                const btnText = btn.querySelector('.btn-text');
+                const originalText = btnText.textContent;
+                btnText.textContent = 'Exporting...';
+                btn.disabled = true;
+                
+                fetch('/export_dashboard', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        view_id: viewId,
+                        workbook_index: parseInt(workbookIndex)
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        alert('Error exporting dashboard: ' + data.error);
+                        return;
+                    }
+                    
+                    // Show crop section
+                    const cropSection = document.querySelector(`.crop-section[data-workbook-index="${workbookIndex}"]`);
+                    cropSection.style.display = 'block';
+                    
+                    // Update crop button
+                    const cropBtn = document.querySelector(`.crop-btn[data-workbook-index="${workbookIndex}"]`);
+                    cropBtn.href = `/crop/${workbookIndex}`;
+                    
+                    // Update timestamp if available
+                    if (data.timestamp) {
+                        const card = btn.closest('.card');
+                        const timestampEl = card.querySelector('.card-header small');
+                        if (timestampEl) {
+                            timestampEl.textContent = `Last pulled: ${data.timestamp}`;
+                        }
+                    }
+                    
+                    btnText.textContent = 'Re-export';
+                })
+                .catch(error => {
+                    console.error('Error exporting dashboard:', error);
+                    alert('Error exporting dashboard: ' + error.message);
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                });
+            }
+        });
+
+        // Check if all images are cropped to show combine section
+        function checkCombineReady() {
+            const cropStatuses = document.querySelectorAll('.crop-status .badge');
+            const totalWorkbooks = {{ session.workbook_count or 0 }};
+            let croppedCount = 0;
+            
+            cropStatuses.forEach(badge => {
+                if (badge.classList.contains('bg-success')) {
+                    croppedCount++;
+                }
+            });
+            
+            const combineSection = document.getElementById('combine-section');
+            if (combineSection && croppedCount === totalWorkbooks && totalWorkbooks > 0) {
+                combineSection.style.display = 'block';
+            }
+        }
+        
+        // Call this periodically or after cropping operations
+        setInterval(checkCombineReady, 1000);
+    </script>
+</body>
+</html>

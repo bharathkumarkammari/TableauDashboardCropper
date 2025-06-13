@@ -1,0 +1,197 @@
+import os
+import logging
+from PIL import Image
+from pdf2image import convert_from_path
+from PyPDF2 import PdfMerger
+from docx import Document
+from docx.shared import Inches
+from typing import List, Dict, Any
+import tempfile
+
+class ImageProcessor:
+    def __init__(self):
+        self.temp_files = []
+    
+    def pdf_to_png(self, pdf_path: str, dpi: int = 200) -> str:
+        """Convert PDF to PNG image"""
+        try:
+            # Convert PDF to images
+            images = convert_from_path(pdf_path, dpi=dpi)
+            
+            if not images:
+                raise Exception("No images found in PDF")
+            
+            # Use the first page
+            image = images[0]
+            
+            # Generate PNG filename
+            base_name = os.path.splitext(os.path.basename(pdf_path))[0]
+            png_path = os.path.join(os.path.dirname(pdf_path), f"{base_name}.png")
+            
+            # Save as PNG
+            image.save(png_path, "PNG")
+            
+            logging.info(f"Successfully converted PDF to PNG: {png_path}")
+            return png_path
+            
+        except Exception as e:
+            logging.error(f"Failed to convert PDF to PNG: {str(e)}")
+            raise Exception(f"PDF conversion failed: {str(e)}")
+    
+    def crop_image(self, image_path: str, crop_data: Dict[str, float]) -> str:
+        """Crop an image based on crop coordinates"""
+        try:
+            image = Image.open(image_path)
+            
+            # Extract crop coordinates
+            x1 = int(crop_data['x'])
+            y1 = int(crop_data['y'])
+            x2 = int(crop_data['x'] + crop_data['width'])
+            y2 = int(crop_data['y'] + crop_data['height'])
+            
+            # Ensure coordinates are within image bounds
+            x1 = max(0, min(x1, image.width))
+            y1 = max(0, min(y1, image.height))
+            x2 = max(0, min(x2, image.width))
+            y2 = max(0, min(y2, image.height))
+            
+            # Ensure we have a valid crop area
+            if x2 <= x1 or y2 <= y1:
+                raise Exception("Invalid crop coordinates")
+            
+            # Crop the image
+            cropped_image = image.crop((x1, y1, x2, y2))
+            
+            # Generate cropped filename
+            base_name = os.path.splitext(os.path.basename(image_path))[0]
+            cropped_path = os.path.join(os.path.dirname(image_path), f"{base_name}_cropped.png")
+            
+            # Save cropped image
+            cropped_image.save(cropped_path, "PNG")
+            
+            logging.info(f"Successfully cropped image: {cropped_path}")
+            return cropped_path
+            
+        except Exception as e:
+            logging.error(f"Failed to crop image: {str(e)}")
+            raise Exception(f"Image cropping failed: {str(e)}")
+    
+    def combine_to_pdf(self, image_paths: List[str], output_dir: str, filename: str) -> str:
+        """Combine multiple images into a single PDF"""
+        try:
+            output_path = os.path.join(output_dir, f"{filename}.pdf")
+            
+            # Convert images to PDF
+            temp_pdfs = []
+            merger = PdfMerger()
+            
+            for i, image_path in enumerate(image_paths):
+                if not os.path.exists(image_path):
+                    logging.warning(f"Image not found: {image_path}")
+                    continue
+                
+                # Open and convert image to RGB if necessary
+                image = Image.open(image_path)
+                if image.mode != 'RGB':
+                    image = image.convert('RGB')
+                
+                # Create temporary PDF for this image
+                temp_pdf_path = os.path.join(output_dir, f"temp_{i}.pdf")
+                image.save(temp_pdf_path, "PDF")
+                temp_pdfs.append(temp_pdf_path)
+                
+                # Add to merger
+                merger.append(temp_pdf_path)
+            
+            if not temp_pdfs:
+                raise Exception("No valid images to combine")
+            
+            # Write combined PDF
+            merger.write(output_path)
+            merger.close()
+            
+            # Clean up temporary PDFs
+            for temp_pdf in temp_pdfs:
+                try:
+                    os.remove(temp_pdf)
+                except:
+                    pass
+            
+            logging.info(f"Successfully created combined PDF: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logging.error(f"Failed to combine images to PDF: {str(e)}")
+            raise Exception(f"PDF combination failed: {str(e)}")
+    
+    def combine_to_word(self, image_paths: List[str], output_dir: str, filename: str) -> str:
+        """Combine multiple images into a single Word document"""
+        try:
+            output_path = os.path.join(output_dir, f"{filename}.docx")
+            
+            # Create new Word document
+            doc = Document()
+            doc.add_heading('Tableau Dashboard Export', 0)
+            
+            for i, image_path in enumerate(image_paths):
+                if not os.path.exists(image_path):
+                    logging.warning(f"Image not found: {image_path}")
+                    continue
+                
+                # Add section heading
+                doc.add_heading(f'Dashboard {i + 1}', level=1)
+                
+                # Add image to document
+                # Calculate appropriate width (max 6 inches)
+                image = Image.open(image_path)
+                aspect_ratio = image.height / image.width
+                width = min(6.0, image.width / 100)  # Convert pixels to inches roughly
+                height = width * aspect_ratio
+                
+                doc.add_picture(image_path, width=Inches(width))
+                
+                # Add page break if not the last image
+                if i < len(image_paths) - 1:
+                    doc.add_page_break()
+            
+            # Save document
+            doc.save(output_path)
+            
+            logging.info(f"Successfully created Word document: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logging.error(f"Failed to combine images to Word: {str(e)}")
+            raise Exception(f"Word document creation failed: {str(e)}")
+    
+    def create_thumbnail(self, image_path: str, max_width: int = 200, max_height: int = 120) -> str:
+        """Create a thumbnail of an image"""
+        try:
+            image = Image.open(image_path)
+            
+            # Calculate thumbnail size maintaining aspect ratio
+            image.thumbnail((max_width, max_height), Image.Resampling.LANCZOS)
+            
+            # Generate thumbnail filename
+            base_name = os.path.splitext(os.path.basename(image_path))[0]
+            thumb_path = os.path.join(os.path.dirname(image_path), f"{base_name}_thumb.png")
+            
+            # Save thumbnail
+            image.save(thumb_path, "PNG")
+            
+            logging.info(f"Successfully created thumbnail: {thumb_path}")
+            return thumb_path
+            
+        except Exception as e:
+            logging.error(f"Failed to create thumbnail: {str(e)}")
+            raise Exception(f"Thumbnail creation failed: {str(e)}")
+    
+    def cleanup_temp_files(self):
+        """Clean up any temporary files created during processing"""
+        for temp_file in self.temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            except:
+                pass
+        self.temp_files.clear()

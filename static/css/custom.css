@@ -1,0 +1,186 @@
+/* Custom styles for Tableau Dashboard Cropper */
+
+.card {
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.preview-img {
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+.crop-status .badge {
+    font-size: 0.875em;
+}
+
+.navbar-brand {
+    font-weight: 600;
+}
+
+.btn {
+    transition: all 0.15s ease-in-out;
+}
+
+.btn:disabled {
+    opacity: 0.65;
+}
+
+.form-select:disabled {
+    opacity: 0.65;
+}
+
+.alert {
+    border: none;
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.btn [data-feather="loader"] {
+    animation: spin 1s linear infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding-left: 15px;
+        padding-right: 15px;
+    }
+    
+    .navbar-text {
+        display: none;
+    }
+    
+    .btn {
+        font-size: 0.875rem;
+    }
+}
+
+/* Crop canvas container */
+.crop-container {
+    position: relative;
+    display: inline-block;
+}
+
+#cropCanvas {
+    display: block;
+    margin: 0 auto;
+}
+
+/* Custom scrollbar for crop container */
+.crop-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.crop-container::-webkit-scrollbar-track {
+    background: var(--bs-body-bg);
+}
+
+.crop-container::-webkit-scrollbar-thumb {
+    background: var(--bs-border-color);
+    border-radius: 4px;
+}
+
+.crop-container::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-secondary);
+}
+
+/* Card equal height */
+.card.h-100 {
+    display: flex;
+    flex-direction: column;
+}
+
+.card.h-100 .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.card.h-100 .card-body > *:last-child {
+    margin-top: auto;
+}
+
+/* Status badges */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.badge [data-feather] {
+    width: 0.875em;
+    height: 0.875em;
+}
+
+/* Form improvements */
+.form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.form-select:focus,
+.form-control:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Button improvements */
+.btn [data-feather] {
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.25rem;
+    vertical-align: -0.125rem;
+}
+
+.btn-sm [data-feather] {
+    width: 0.875rem;
+    height: 0.875rem;
+}
+
+/* Navigation improvements */
+.navbar-brand [data-feather] {
+    width: 1.25rem;
+    height: 1.25rem;
+    margin-right: 0.5rem;
+    vertical-align: -0.25rem;
+}
+
+/* Progress and status indicators */
+.progress {
+    height: 0.5rem;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Toast-like flash messages */
+.alert {
+    border-left: 4px solid;
+}
+
+.alert-success {
+    border-left-color: var(--bs-success);
+}
+
+.alert-danger {
+    border-left-color: var(--bs-danger);
+}
+
+.alert-warning {
+    border-left-color: var(--bs-warning);
+}
+
+.alert-info {
+    border-left-color: var(--bs-info);
+}
