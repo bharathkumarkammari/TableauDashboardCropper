@@ -7,8 +7,6 @@ A web-based application that allows users to export Tableau dashboards, crop cha
 ## 🌐 Live Demo
 🔗 [https://tableaudashboardcropper.onrender.com/login](https://tableaudashboardcropper.onrender.com/login)
 
-> ⏱ Note: This may take 30–50 seconds to load due to Render’s free tier spin-up delay.
-
 ---
 
 ## ✨ Key Features
@@ -21,6 +19,17 @@ A web-based application that allows users to export Tableau dashboards, crop cha
 - 📄 Generate Word report with all selected dashboards on one page (50% image left, 50% text right)
 - 🧠 Prompt user for output filename before generating report
 - 📦 Saves files to `output/` and shows download link
+
+---
+
+## 🖼️ Output Formats
+
+- ✅ **PDF (.PDF)**
+- ✅ **Word (.docx)** report with:
+  - Export summary (timestamp + total dashboards)
+  - Each cropped image aligned left
+  - Corresponding metadata (Project, Workbook, Dashboard, Exported Time) aligned right
+  - If two dashboards: both appear on the same page
 
 ---
 
@@ -57,24 +66,32 @@ A web-based application that allows users to export Tableau dashboards, crop cha
 
 ## 🚀 Deployment Instructions
 
-### 1. Clone the repo
-```bash
-git clone https://github.com/bharathkumarkammari/TableauDashboardCropper.git
-cd TableauDashboardCropper
-```
+## 🚀 How to Deploy (Render)
 
-### 2. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+1. Push your app code to a public GitHub repo
+2. Go to [Render](https://render.com), click **New Web Service**
+3. Choose your repo, and enter the desired service name
+4. Add a `render.yaml` file or use:
+    ```
+    buildCommand: ""
+    startCommand: gunicorn main:app
+    ```
+5. App will be live at `https://<your-app>.onrender.com`
 
-### 3. Run locally
-```bash
-python main.py
-```
+---
 
-> Or deploy instantly to Render.com using `render.yaml`
+## 🧪 Local Setup (Optional)
 
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Set up `poppler` (for PDF to image conversion)
+3. Run locally:
+   ```bash
+   flask run
+   ```
 ---
 
 ## 🧪 Sample Screenshots
